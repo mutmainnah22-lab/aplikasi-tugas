@@ -1,0 +1,35 @@
+# --- Dependensi ---
+node_modules/
+
+# --- Hasil build ---
+dist/
+build/
+out/
+
+# --- Rahasia & lingkungan (jangan pernah di-commit) ---
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+credentials.json
+service-account*.json
+.secrets/
+*.secret
+
+# --- Log & cache ---
+*.log
+npm-debug.log*
+.cache/
+.tmp/
+
+# --- Editor & OS ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

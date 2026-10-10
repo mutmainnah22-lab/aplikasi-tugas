@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uji Logika &mdash; Manajemen Proyek Gantt</title>
+<style>
+  body { margin: 0; font-family: "Segoe UI", system-ui, sans-serif; background: #f1f5f9; color: #0f172a; }
+  header { background: #0f172a; color: #fff; padding: 16px 22px; }
+  header h1 { margin: 0; font-size: 17px; }
+  header p { margin: 4px 0 0; font-size: 12.5px; color: #cbd5e1; }
+  #ringkas { margin: 16px 22px 0; padding: 12px 16px; border-radius: 10px; font-weight: 700; font-size: 14px; }
+  #ringkas.lulus { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+  #ringkas.gagal { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+  ul { list-style: none; margin: 14px 22px 30px; padding: 0; }
+  li { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; font-size: 13px; display: flex; gap: 10px; align-items: baseline; }
+  li .tanda { font-weight: 800; width: 18px; flex: 0 0 auto; }
+  li.lulus .tanda { color: #16a34a; }
+  li.gagal { border-color: #fca5a5; background: #fff5f5; }
+  li.gagal .tanda { color: #dc2626; }
+  li.lewat .tanda { color: #d97706; }
+  li .rincian { color: #64748b; font-size: 12px; }
+  a { color: #2563eb; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Uji Logika &mdash; Manajemen Proyek Gantt</h1>
+  <p>Harness ini menjalankan pengujian otomatis pada <code>js/logic.js</code>. Buka di browser, lalu lihat hasilnya di bawah. Kembali ke <a href="index.html">index.html</a> untuk aplikasinya.</p>
+</header>
+<div id="ringkas">Menjalankan uji&hellip;</div>
+<ul id="daftarHasil"></ul>
+
+<script src="js/logic.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var L = window.GanttLogika;
+  var hasil = [];
+  var ringkas = document.getElementById('ringkas');
+  var daftarHasil = document.getElementById('daftarHasil');
+
+  function ok(nama, kondisi, rincian) {
+    hasil.push({ nama: nama, status: kondisi ? 'lulus' : 'gagal', rincian: rincian || '' });
+  }
+
+  function lewat(nama, alasan) {
+    hasil.push({ nama: nama, status: 'lewat', rincian: alasan || '' });
+  }
+
+  function jalankan(nama, fn) {
+    try {
+      var r = fn();
+      if (r === true || r === undefined) ok(nama, true);
+      else if (r === false) ok(nama, false);
+      else ok(nama, false, 'hasil tak terduga: ' + JSON.stringify(r));
+    } catch (e) {
+      ok(nama, false, 'error: ' + (e && e.message ? e.message : String(e)));
+    }
+  }
+
+  if (!L) {
+    ringkas.className = 'gagal';
+    ringkas.textContent = 'Gagal memuat js/logic.js';
+    return;
+  }
+
+  /* ---------- Tanggal & hari kerja ---------- */
+
+  jalankan('parseTanggal membaca YYYY-MM-DD secara lokal', function () {
+    var d = L.parseTanggal('2026-10-12');
+    return !!d && d.getFullYear() === 2026 && d.getMonth() === 9 && d.getDate() === 12;
+  });
+
+  jalankan('parseTanggal menolak bulan 13', function () {
+    return L.parseTanggal('2026-13-01') === null;
+  });
+
+  jalankan('parseTanggal menolak 30 Februari', function () {
+    return L.parseTanggal('2026-02-30') === null;
+  });
+
+  jalankan('parseTanggal menolak format DD-MM-YYYY', function () {
+    return L.parseTanggal('12-10-2026') === null;
+  });
+
+  jalankan('formatTanggal menulis nol di depan', function () {
+    return L.formatTanggal(new Date(2026, 0, 5)) === '2026-01-05';
+  });
+
+  jalankan('10 Okt 2026 = Sabtu (akhir pekan)', function () {
+    return L.hariKerja(new Date(2026, 9, 10)) === false;
+  });
+
+  jalankan('12 Okt 2026 = Senin (hari kerja)', function () {
+    return L.hariKerja(new Date(2026, 9, 12)) === true;
+  });
+
+  jalankan('selisihHari menghitung selisih kalender', function () {
+    return L.selisihHari(L.parseTanggal('2026-10-12'), L.parseTanggal('2026-10-20')) === 8;
+  });
+
+  jalankan('Senin + 5 hari kerja = Jumat', function () {
+    return L.hitungTanggalSelesai('2026-10-12', 5) === '2026-10-16';
+  });
+
+  jalankan('Jumat + 3 hari kerja = Selasa (lewati akhir pekan)', function () {
+    return L.hitungTanggalSelesai('2026-10-16', 3) === '2026-10-20';
+  });
+
+  jalankan('Mulai Sabtu + 1 hari kerja = Senin', function () {
+    return L.hitungTanggalSelesai('2026-10-10', 1) === '2026-10-12';
+  });
+
+  jalankan('Durasi 1 pada hari kerja = tanggal yang sama', function () {
+    return L.hitungTanggalSelesai('2026-10-12', 1) === '2026-10-12';
+  });
+
+  jalankan('Senin 23 Nov 2026 + 10 hari kerja = Jumat 4 Des', function () {
+    return L.hitungTanggalSelesai('2026-11-23', 10) === '2026-12-04';
+  });
+
+  jalankan('hitungHariKerja Senin..Minggu = 5', function () {
+    return L.hitungHariKerja('2026-10-12', '2026-10-18') === 5;
+  });
+
+  jalankan('tanggal mulai tidak valid menghasilkan null', function () {
+    return L.hitungTanggalSelesai('bukan-tanggal', 3) === null;
+  });
+
+  /* ---------- Pohon tugas ---------- */
+
+  var pohonContoh = [
+    { id: 'a', nama: 'A', mulai: '2026-10-12', durasi: 3, prioritas: 'sedang', warna: '#3b82f6', parentId: null },
+    { id: 'b', nama: 'B', mulai: '2026-10-12', durasi: 3, prioritas: 'sedang', warna: '#3b82f6', parentId: 'a' },
+    { id: 'c', nama: 'C', mulai: '2026-10-14', durasi: 2, prioritas: 'tinggi', warna: '#3b82f6', parentId: 'b' }
+  ];
+
+  jalankan('bangunPohon: hanya A yang jadi akar', function () {
+    var p = L.bangunPohon(pohonContoh);
+    return p.length === 1 && p[0].task.id === 'a' && p[0].anak.length === 1;
+  });
+
+  jalankan('ratakan: tingkat 0-1-2 dan urut benar', function () {
+    var r = L.ratakan(L.bangunPohon(pohonContoh), new Set());
+    return r.length === 3 &&
+      r[0].tugas.id === 'a' && r[0].level === 0 &&
+      r[1].tugas.id === 'b' && r[1].level === 1 &&
+      r[2].tugas.id === 'c' && r[2].level === 2;
+  });
+
+  jalankan('ratakan: induk yang dicubit hanya menampilkan 1 baris', function () {
+    var r = L.ratakan(L.bangunPohon(pohonContoh), new Set(['a']));
+    return r.length === 1 && r[0].tugas.id === 'a' && r[0].terlipat === true;
+  });
+
+  jalankan('induk yatim ditampilkan sebagai tugas utama', function () {
+    var t = [{ id: 'x', nama: 'X', mulai: '2026-10-12', durasi: 1, prioritas: 'sedang', warna: '#3b82f6', parentId: 'zz' }];
+    var p = L.bangunPohon(t);
+    return p.length === 1 && p[0].task.id === 'x';
+  });
+
+  jalankan('Siklus saling induk tidak membuat tugas hilang', function () {
+    var t = [
+      { id: 'a', nama: 'A', mulai: '2026-10-12', durasi: 1, prioritas: 'sedang', warna: '#3b82f6', parentId: 'b' },
+      { id: 'b', nama: 'B', mulai: '2026-10-12', durasi: 1, prioritas: 'sedang', warna: '#3b82f6', parentId: 'a' }
+    ];
+    var r = L.ratakan(L.bangunPohon(t), new Set());
+    return r.length === 2;
+  });
+
+  jalankan('turunan mengambil seluruh sub-tugas berjenjang', function () {
+    var d = L.turunan(pohonContoh, 'a');
+    return d.length === 2 && d.indexOf('b') >= 0 && d.indexOf('c') >= 0;
+  });
+
+  jalankan('punyaSiklus menolak induk yang adalah turunannya sendiri', function () {
+    return L.punyaSiklus(pohonContoh, 'a', 'b') === true;
+  });
+
+  jalankan('punyaSiklus menolak induk = dirinya sendiri', function () {
+    return L.punyaSiklus(pohonContoh, 'a', 'a') === true;
+  });
+
+  jalankan('punyaSiklus mengizinkan induk yang sah', function () {
+    return L.punyaSiklus(pohonContoh, 'c', null) === false;
+  });
+
+  /* ---------- Validasi ---------- */
+
+  jalankan('Nama kosong ditolak', function () {
+    var h = L.validasiTugas({ nama: '   ', mulai: '2026-10-12', durasi: 3, prioritas: 'sedang', warna: '#333333' });
+    return h.valid === false && h.pesan.length > 0;
+  });
+
+  jalankan('Durasi 0 ditolak', function () {
+    return L.validasiTugas({ nama: 'Tugas', mulai: '2026-10-12', durasi: 0, prioritas: 'sedang', warna: '#333333' }).valid === false;
+  });
+
+  jalankan('Durasi bukan angka ditolak', function () {
+    return L.validasiTugas({ nama: 'Tugas', mulai: '2026-10-12', durasi: 'abc', prioritas: 'sedang', warna: '#333333' }).valid === false;
+  });
+
+  jalankan('Data sah dinormalisasi (nama dipangkas, durasi jadi angka)', function () {
+    var h = L.validasiTugas({ nama: '  Desain UI  ', mulai: '2026-10-12', durasi: '7', prioritas: 'tinggi', warna: '#AABBCC' });
+    return h.valid === true &&
+      h.nilai.nama === 'Desain UI' &&
+      h.nilai.durasi === 7 &&
+      h.nilai.mulai === '2026-10-12' &&
+      h.nilai.prioritas === 'tinggi' &&
+      h.nilai.warna === '#aabbcc';
+  });
+
+  jalankan('Prioritas tak dikenal jatuh ke "sedang"', function () {
+    var h = L.validasiTugas({ nama: 'Tugas', mulai: '2026-10-12', durasi: 2, prioritas: 'ilegal', warna: '#333333' });
+    return h.valid === true && h.nilai.prioritas === 'sedang';
+  });
+
+  jalankan('Warna tak valid jatuh ke warna bawaan', function () {
+    var h = L.validasiTugas({ nama: 'Tugas', mulai: '2026-10-12', durasi: 2, prioritas: 'sedang', warna: 'merah' });
+    return h.valid === true && h.nilai.warna === '#3b82f6';
+  });
+
+  jalankan('Tugas tanpa nama tidak bisa dinormalisasi', function () {
+    return L.normalisasiTugas({ mulai: '2026-10-12', durasi: 2 }) === null;
+  });
+
+  jalankan('Durasi rusak dinormalisasi menjadi 1', function () {
+    var n = L.normalisasiTugas({ id: 'z', nama: 'X', mulai: '2026-10-12', durasi: 'abc' });
+    return !!n && n.durasi === 1 && n.parentId === null;
+  });
+
+  /* ---------- Data contoh ---------- */
+
+  jalankan('Data contoh punya 13 tugas dengan id unik', function () {
+    var c = L.contohTugas();
+    var unik = {};
+    c.forEach(function (t) { unik[t.id] = true; });
+    return c.length === 13 && Object.keys(unik).length === 13;
+  });
+
+  jalankan('Data contoh: semua induk ada, semua tanggal valid & hari kerja', function () {
+    var c = L.contohTugas();
+    var ada = {};
+    c.forEach(function (t) { ada[t.id] = true; });
+    var semuaOk = c.every(function (t) {
+      var s = L.parseTanggal(t.mulai);
+      var indukOk = !t.parentId || !!ada[t.parentId];
+      return !!s && L.hariKerja(s) && indukOk && t.durasi >= 1;
+    });
+    return semuaOk;
+  });
+
+  jalankan('Data contoh: semua sub-tugas punya tanggal selesai valid', function () {
+    var c = L.contohTugas();
+    return c.every(function (t) { return !!L.hitungTanggalSelesai(t.mulai, t.durasi); });
+  });
+
+  /* ---------- Kalender proyek ---------- */
+
+  var kalAsli = L.getKalender();
+
+  try {
+    jalankan('Kalender bawaan: akhir pekan Sabtu & Minggu, tanpa libur', function () {
+      var k = L.kalenderBawaan();
+      return k.akhirPekan.length === 2 && k.akhirPekan.indexOf(0) >= 0 &&
+        k.akhirPekan.indexOf(6) >= 0 && k.libur.length === 0;
+    });
+
+    jalankan('validasiKalender membuang entri rusak dan duplikat', function () {
+      var h = L.validasiKalender({
+        akhirPekan: [1, 1, 9, 'x', 5],
+        libur: [
+          { tanggal: '2026-12-25', nama: 'Natal' },
+          { tanggal: 'bukan-tanggal', nama: '?' },
+          { tanggal: '2026-12-25', nama: 'duplikat' }
+        ]
+      });
+      return h.valid === true && h.nilai.akhirPekan.length === 2 &&
+        h.nilai.akhirPekan.indexOf(1) >= 0 && h.nilai.akhirPekan.indexOf(5) >= 0 &&
+        h.nilai.libur.length === 1 && h.nilai.libur[0].tanggal === '2026-12-25';
+    });
+
+    jalankan('validasiKalender: daftar kosong berarti tanpa akhir pekan', function () {
+      var h = L.validasiKalender({ akhirPekan: [], libur: [] });
+      return h.valid === true && h.nilai.akhirPekan.length === 0;
+    });
+
+    jalankan('Akhir pekan kustom dipakai saat hitung durasi', function () {
+      L.setKalender({ akhirPekan: [1, 3], libur: [] }); /* Senin & Rabu libur */
+      /* Senin 12 Okt libur -> hari kerja berikutnya Selasa 13 Okt */
+      return L.hitungTanggalSelesai('2026-10-12', 1) === '2026-10-13';
+    });
+
+    jalankan('Hari libur khusus dilewati saat hitung durasi', function () {
+      L.setKalender({ akhirPekan: [0, 6], libur: [{ tanggal: '2026-10-14', nama: 'Libur' }] });
+      /* Senin 12 + 3 hari kerja: Sel 13, Rab 14 (libur), Kam 15 */
+      return L.hitungTanggalSelesai('2026-10-12', 3) === '2026-10-15';
+    });
+
+    jalankan('Hari libur khusus mengurangi hitungan hari kerja', function () {
+      /* Senin 12 .. Jumat 16 dengan Rabu 14 libur = 4 hari kerja */
+      return L.hitungHariKerja('2026-10-12', '2026-10-16') === 4;
+    });
+
+    jalankan('setKalender + getKalender menyimpan salinan yang sama', function () {
+      L.setKalender({ akhirPekan: [0, 6], libur: [{ tanggal: '2026-01-01', nama: 'Tahun Baru' }] });
+      var k = L.getKalender();
+      return k.akhirPekan.length === 2 && k.libur.length === 1 &&
+        k.libur[0].tanggal === '2026-01-01' && k.libur[0].nama === 'Tahun Baru';
+    });
+  } finally {
+    L.setKalender(kalAsli);
+  }
+
+  /* ---------- Predecessor & penjadwalan ---------- */
+
+  jalankan('validasiPredecessors menerima FS dan SS', function () {
+    var h = L.validasiPredecessors([
+      { id: 'a', type: 'FS', delay: 2 },
+      { id: 'b', type: 'SS', delay: 0 }
+    ]);
+    return h.valid === true && h.nilai.length === 2 &&
+      h.nilai[0].type === 'FS' && h.nilai[0].delay === 2 && h.nilai[1].type === 'SS';
+  });
+
+  jalankan('validasiPredecessors menolak jeda negatif', function () {
+    return L.validasiPredecessors([{ id: 'a', type: 'FS', delay: -1 }]).valid === false;
+  });
+
+  jalankan('validasiPredecessors menolak predecessor ganda', function () {
+    return L.validasiPredecessors([
+      { id: 'a', type: 'FS', delay: 0 },
+      { id: 'a', type: 'SS', delay: 1 }
+    ]).valid === false;
+  });
+
+  jalankan('normalisasiPredecessors membuang entri rusak & mengunci jeda', function () {
+    var n = L.normalisasiPredecessors([
+      { id: 'a', type: 'XYZ', delay: 9999 },
+      { id: '', type: 'FS', delay: 0 },
+      'bukan-objek',
+      { id: 'a', type: 'SS', delay: 1 }
+    ]);
+    return n.length === 1 && n[0].id === 'a' && n[0].type === 'FS' && n[0].delay === 365;
+  });
+
+  jalankan('FS: mulai tepat hari kerja setelah prediksi selesai', function () {
+    var t = [
+      { id: 'a', nama: 'A', mulai: '2026-10-12', durasi: 5, prioritas: 'sedang', warna: '#3b82f6', parentId: null, predecessors: [] },
+      { id: 'b', nama: 'B', mulai: '2026-10-12', durasi: 2, prioritas: 'sedang', warna: '#3b82f6', parentId: null, predecessors: [{ id: 'a', type: 'FS', delay: 0 }] }
+    ];
+    var r = L.jadwalkanUlang(t);
+    /* A selesai Jumat 16 Okt -> B mulai Senin 19 Okt */
+    return r.ok === true && r.diubah >= 1 && t[1].mulai === '2026-10-19';
+  });
+
+  jalankan('FS dengan jeda 2 hari kerja menambah jarak', function () {
+    var t = [
+      { id: 'a', nama: 'A', mulai: '2026-10-12', durasi: 5, prioritas: 'sedang', warna: '#3b82f6', parentId: null, predecessors: [] },
+      { id: 'b', nama: 'B', mulai: '2026-10-12', durasi: 2, prioritas: 'sedang', warna: '#3b82f6', parentId: null, predecessors: [{ id: 'a', type: 'FS', delay: 2 }] }
+    ];
+    L.jadwalkanUlang(t);
+    /* Jumat 16 + 3 hari kerja = Rabu 21 Okt */
+    return t[1].mulai === '2026-10-21';
+  });
+
+  jalankan('SS: mulai bersama prediksi ditambah jeda hari kerja', function () {
+    var t = [
+      { id: 'a', nama: 'A', mulai: '2026-10-12', durasi: 5, prioritas: 'sedang', warna: '#3b82f6', parentId: null, predecessors: [] },
+      { id: 'b', nama: 'B', mulai: '2026-10-12', durasi: 2, prioritas: 'sedang', warna: '#3b82f6', parentId: null, predecessors: [{ id: 'a', type: 'SS', delay: 1 }] }
+    ];
+    L.jadwalkanUlang(t);
+    /* Senin 12 + 1 hari kerja = Selasa 13 */
+    return t[1].mulai === '2026-10-13';
+  });
+
+  jalankan('Rantai predecessor diurutkan walau urutan array terbalik', function () {
+    var t = [
+      { id: 'd', nama: 'D', mulai: '2026-10-12', durasi: 1, prioritas: 'sedang', warna: '#3b82f6', parentId: null, predecessors: [{ id: 'b', type: 'FS', delay: 0 }] },
+      { id: 'b', nama: 'B', mulai: '2026-10-12', durasi: 2, prioritas: 'sedang', warna: '#3b82f6', parentId: null, predecessors: [{ id: 'a', type: 'FS', delay: 0 }] },
+      { id: 'a', nama: 'A', mulai: '2026-10-12', durasi: 5, prioritas: 'sedang', warna: '#3b82f6', parentId: null, predecessors: [] }
+    ];
+    var r = L.jadwalkanUlang(t);
+    /* a: 12\u201316; b: 19\u201320; d: 21 */
+    return r.ok === true && t[2].mulai === '2026-10-12' &&
+      t[1].mulai === '2026-10-19' && t[0].mulai === '2026-10-21';
+  });
+
+  jalankan('Beberapa predecessor: diambil batas paling akhir', function () {
+    var t = [
+      { id: 'a', nama: 'A', mulai: '2026-10-12', durasi: 5, prioritas: 'sedang', warna: '#3b82f6', parentId: null, predecessors: [] },
+      { id: 'c', nama: 'C', mulai: '2026-10-20', durasi: 1, prioritas: 'sedang', warna: '#3b82f6', parentId: null, predecessors: [] },
+      { id: 'e', nama: 'E', mulai: '2026-10-12', durasi: 2, prioritas: 'sedang', warna: '#3b82f6', parentId: null, predecessors: [
+        { id: 'a', type: 'FS', delay: 0 },
+        { id: 'c', type: 'SS', delay: 0 }
+      ] }
+    ];
+    L.jadwalkanUlang(t);
+    /* FS dari a = 19 Okt, SS dari c = 20 Okt -> diambil 20 Okt */
+    return t[2].mulai === '2026-10-20';
+  });
+
+  jalankan('Tugas tanpa predecessor tidak digeser', function () {
+    var t = [
+      { id: 'a', nama: 'A', mulai: '2026-10-13', durasi: 3, prioritas: 'sedang', warna: '#3b82f6', parentId: null, predecessors: [] },
+      { id: 'b', nama: 'B', mulai: '2026-10-12', durasi: 5, prioritas: 'sedang', warna: '#3b82f6', parentId: null, predecessors: [{ id: 'a', type: 'FS', delay: 0 }] }
+    ];
+    var r = L.jadwalkanUlang(t);
+    return r.ok === true && t[0].mulai === '2026-10-13';
+  });
+
+  jalankan('urutkanTopologi mengurutkan prediksi lebih dulu', function () {
+    var t = [
+      { id: 'b', predecessors: [{ id: 'a', type: 'FS', delay: 0 }] },
+      { id: 'a', predecessors: [] }
+    ];
+    var u = L.urutkanTopologi(t);
+    return !!u && u.length === 2 && u[0].id === 'a' && u[1].id === 'b';
+  });
+
+  jalankan('Siklus predecessor terdeteksi urutkanTopologi', function () {
+    var t = [
+      { id: 'a', predecessors: [{ id: 'b', type: 'FS', delay: 0 }] },
+      { id: 'b', predecessors: [{ id: 'a', type: 'FS', delay: 0 }] }
+    ];
+    return L.urutkanTopologi(t) === null;
+  });
+
+  jalankan('Siklus predecessor menggagalkan penjadwalan tanpa ubah data', function () {
+    var t = [
+      { id: 'a', nama: 'A', mulai: '2026-10-12', durasi: 5, prioritas: 'sedang', warna: '#3b82f6', parentId: null, predecessors: [{ id: 'b', type: 'FS', delay: 0 }] },
+      { id: 'b', nama: 'B', mulai: '2026-10-13', durasi: 5, prioritas: 'sedang', warna: '#3b82f6', parentId: null, predecessors: [{ id: 'a', type: 'FS', delay: 0 }] }
+    ];
+    var r = L.jadwalkanUlang(t);
+    return r.ok === false && t[0].mulai === '2026-10-12' && t[1].mulai === '2026-10-13';
+  });
+
+  jalankan('Data contoh memakai hubungan FS dan SS', function () {
+    var c = L.contohTugas();
+    var adaFS = false;
+    var adaSS = false;
+    c.forEach(function (t) {
+      L.normalisasiPredecessors(t.predecessors).forEach(function (p) {
+        if (p.type === 'FS') adaFS = true;
+        if (p.type === 'SS') adaSS = true;
+      });
+    });
+    return adaFS && adaSS;
+  });
+
+  /* ---------- Anggota tim & alokasi ---------- */
+
+  jalankan('normalisasiAnggota membetulkan nilai rusak', function () {
+    var n = L.normalisasiAnggota({ id: 'x', nama: '  Budi Santoso  ', email: 'BUKAN-EMAIL', peran: '', gaji: 'abc' });
+    return !!n && n.nama === 'Budi Santoso' && n.email === '' &&
+      n.peran === 'Anggota Tim' && n.gaji === 0;
+  });
+
+  jalankan('normalisasiAnggota menolak data tanpa nama', function () {
+    return L.normalisasiAnggota({ nama: '   ', email: 'a@b.co' }) === null;
+  });
+
+  jalankan('validasiAnggota: nama wajib diisi', function () {
+    return L.validasiAnggota({ nama: '', email: 'a@b.co', gaji: 100 }).valid === false;
+  });
+
+  jalankan('validasiAnggota: email tidak valid ditolak', function () {
+    return L.validasiAnggota({ nama: 'A', email: 'bukan-email', gaji: 100 }).valid === false;
+  });
+
+  jalankan('validasiAnggota: gaji negatif ditolak', function () {
+    return L.validasiAnggota({ nama: 'A', email: 'a@b.co', gaji: -5 }).valid === false;
+  });
+
+  jalankan('validasiAnggota: email ganda ditolak, kecuali miliknya sendiri', function () {
+    var semua = [{ id: 'a1', nama: 'A', email: 'a@b.co', peran: 'X', gaji: 0 }];
+    var ganda = L.validasiAnggota({ nama: 'B', email: 'A@B.CO', gaji: 0 }, semua, null);
+    var diri = L.validasiAnggota({ nama: 'A', email: 'a@b.co', gaji: 0 }, semua, 'a1');
+    return ganda.valid === false && diri.valid === true;
+  });
+
+  jalankan('normalisasiAlokasi membuang duplikat & bukan string', function () {
+    var n = L.normalisasiAlokasi(['a1', 'a1', 5, '', 'a2', null]);
+    return n.length === 2 && n[0] === 'a1' && n[1] === 'a2';
+  });
+
+  jalankan('Data contoh anggota: 4 orang, id unik, email & gaji valid', function () {
+    var c = L.contohAnggota();
+    var unik = {};
+    c.forEach(function (a) { unik[a.id] = true; });
+    return c.length === 4 && Object.keys(unik).length === 4 &&
+      c.every(function (a) { return a.email.indexOf('@') > 0 && a.gaji > 0; });
+  });
+
+  jalankan('Data contoh tugas mengacu ke anggota yang ada', function () {
+    var ada = {};
+    L.contohAnggota().forEach(function (a) { ada[a.id] = true; });
+    var tasks = L.contohTugas();
+    var semuaAda = tasks.every(function (t) {
+      return L.normalisasiAlokasi(t.anggota).every(function (id) { return !!ada[id]; });
+    });
+    var adaAlokasi = tasks.some(function (t) {
+      return L.normalisasiAlokasi(t.anggota).length > 0;
+    });
+    return semuaAda && adaAlokasi;
+  });
+
+  /* ---------- Mundur hari kerja ---------- */
+
+  jalankan('mundurHariKerja melewati akhir pekan', function () {
+    return L.formatTanggal(L.mundurHariKerja(L.parseTanggal('2026-10-19'), 1)) === '2026-10-16';
+  });
+
+  jalankan('mundurHariKerja dari awal pekan mundur ke Jumat sebelumnya', function () {
+    return L.formatTanggal(L.mundurHariKerja(L.parseTanggal('2026-10-12'), 1)) === '2026-10-09';
+  });
+
+  jalankan('mundurHariKerja nol mengembalikan tanggal yang sama', function () {
+    return L.formatTanggal(L.mundurHariKerja(L.parseTanggal('2026-10-15'), 0)) === '2026-10-15';
+  });
+
+  /* ---------- Critical path ---------- */
+
+  jalankan('Jalur kritis: rantai FS penuh semua slack-nya nol', function () {
+    var t = [
+      { id: 'a', nama: 'A', mulai: '2026-10-12', durasi: 5, predecessors: [] },
+      { id: 'b', nama: 'B', mulai: '2026-10-12', durasi: 2, predecessors: [{ id: 'a', type: 'FS', delay: 0 }] },
+      { id: 'c', nama: 'C', mulai: '2026-10-12', durasi: 2, predecessors: [{ id: 'b', type: 'FS', delay: 0 }] }
+    ];
+    var r = L.hitungAnalisis(t);
+    /* a: 12\u201316, b: 19\u201320, c: 21\u201322 (9 hari kerja) */
+    return r.ok === true && r.proyekSelesai === '2026-10-22' && r.hariKerjaProyek === 9 &&
+      r.tugas.a.kritis === true && r.tugas.b.kritis === true && r.tugas.c.kritis === true &&
+      r.jalurKritis.length === 3;
+  });
+
+  jalankan('Slack: cabang yang tidak menentukan waktu selesai punya slack', function () {
+    var t = [
+      { id: 'a', nama: 'A', mulai: '2026-10-12', durasi: 5, predecessors: [] },
+      { id: 'b', nama: 'B', mulai: '2026-10-12', durasi: 1, predecessors: [] },
+      { id: 'c', nama: 'C', mulai: '2026-10-12', durasi: 1, predecessors: [{ id: 'a', type: 'FS', delay: 0 }] }
+    ];
+    var r = L.hitungAnalisis(t);
+    /* selesai proyek 19 Okt; b bisa mundur 5 hari kerja */
+    return r.ok === true && r.proyekSelesai === '2026-10-19' &&
+      r.tugas.a.kritis === true && r.tugas.b.kritis === false && r.tugas.b.slack === 5 &&
+      r.jalurKritis.join(',') === 'a,c';
+  });
+
+  jalankan('Slack pada hubungan SS dihitung dari mulai, bukan selesai', function () {
+    var t = [
+      { id: 'a', nama: 'A', mulai: '2026-10-12', durasi: 5, predecessors: [] },
+      { id: 'b', nama: 'B', mulai: '2026-10-12', durasi: 2, predecessors: [{ id: 'a', type: 'SS', delay: 0 }] }
+    ];
+    var r = L.hitungAnalisis(t);
+    /* b mulai 12, selesai proyek 16 -> b bisa mundur 3 hari kerja */
+    return r.ok === true && r.tugas.b.mulai === '2026-10-12' && r.tugas.b.slack === 3 &&
+      r.tugas.a.kritis === true && r.jalurKritis.join(',') === 'a';
+  });
+
+  jalankan('Jeda FS menaikkan awal paling lambat prediksi', function () {
+    var t = [
+      { id: 'a', nama: 'A', mulai: '2026-10-12', durasi: 5, predecessors: [] },
+      { id: 'b', nama: 'B', mulai: '2026-10-12', durasi: 1, predecessors: [{ id: 'a', type: 'FS', delay: 2 }] }
+    ];
+    var r = L.hitungAnalisis(t);
+    /* b mulai 21 Okt; a tetap kritis karena jeda menekannya */
+    return r.ok === true && r.tugas.b.mulai === '2026-10-21' &&
+      r.tugas.a.kritis === true && r.tugas.b.kritis === true;
+  });
+
+  jalankan('Analisis menolak siklus predecessor', function () {
+    var t = [
+      { id: 'a', predecessors: [{ id: 'b', type: 'FS', delay: 0 }] },
+      { id: 'b', predecessors: [{ id: 'a', type: 'FS', delay: 0 }] }
+    ];
+    return L.hitungAnalisis(t).ok === false;
+  });
+
+  jalankan('Analisis aman pada daftar kosong', function () {
+    var r = L.hitungAnalisis([]);
+    return r.ok === true && r.jalurKritis.length === 0;
+  });
+
+  /* ---------- Diagram PERT (jaringan) ---------- */
+
+  jalankan('tingkatJaringan menempatkan tugas pada kolom kedalamannya', function () {
+    var t = [
+      { id: 'c', predecessors: [{ id: 'b', type: 'FS', delay: 0 }] },
+      { id: 'b', predecessors: [{ id: 'a', type: 'FS', delay: 0 }] },
+      { id: 'a', predecessors: [] },
+      { id: 'd', predecessors: [] }
+    ];
+    var j = L.tingkatJaringan(t);
+    return j.ok === true && j.tingkat.a === 0 && j.tingkat.d === 0 &&
+      j.tingkat.b === 1 && j.tingkat.c === 2 && j.kolom === 3;
+  });
+
+  jalankan('tingkatJaringan menolak siklus predecessor', function () {
+    var t = [
+      { id: 'a', predecessors: [{ id: 'b', type: 'FS', delay: 0 }] },
+      { id: 'b', predecessors: [{ id: 'a', type: 'FS', delay: 0 }] }
+    ];
+    return L.tingkatJaringan(t).ok === false;
+  });
+
+  /* ---------- Penyimpanan (dengan pemulihan data asli) ---------- */
+
+  var bisaSimpan = true;
+  try {
+    window.localStorage.setItem('__uji__', '1');
+    window.localStorage.removeItem('__uji__');
+  } catch (e) {
+    bisaSimpan = false;
+  }
+
+  if (!bisaSimpan) {
+    lewat('Simpan & muat tugas (localStorage)', 'localStorage tidak tersedia di lingkungan ini');
+    lewat('Data rusak ditangani', 'localStorage tidak tersedia di lingkungan ini');
+    lewat('Kunci kosong menghasilkan null', 'localStorage tidak tersedia di lingkungan ini');
+  } else {
+    var kunci = L.KUNCI_TUGAS;
+    var asli = null;
+    try { asli = window.localStorage.getItem(kunci); } catch (e1) { asli = null; }
+
+    try {
+      var ujiSimpan = [
+        { id: 'u1', nama: 'Uji Simpan', mulai: '2026-10-12', durasi: 4, prioritas: 'kritis', warna: '#ef4444', parentId: null },
+        { id: 'u2', nama: 'Uji Sub', mulai: '2026-10-14', durasi: 2, prioritas: 'rendah', warna: '#16a34a', parentId: 'u1' }
+      ];
+      L.simpanTugas(ujiSimpan);
+      var muat = L.muatTugas();
+      hasil.push({
+        nama: 'Simpan lalu muat: data utuh (2 tugas, sub-tugas tetap terhubung)',
+        status: (muat && muat.length === 2 && muat[1].parentId === 'u1' && muat[0].durasi === 4) ? 'lulus' : 'gagal',
+        rincian: (muat && muat.length === 2) ? '' : 'jumlah data: ' + (muat ? muat.length : 'null')
+      });
+
+      window.localStorage.setItem(kunci, '{bukan json yang valid');
+      var rusak = L.muatTugas();
+      hasil.push({
+        nama: 'Data rusak di localStorage tidak menimbulkan error (hasil [])',
+        status: (rusak && rusak.length === 0) ? 'lulus' : 'gagal',
+        rincian: ''
+      });
+
+      window.localStorage.removeItem(kunci);
+      var kosong = L.muatTugas();
+      hasil.push({
+        nama: 'Belum pernah menyimpan menghasilkan null',
+        status: (kosong === null) ? 'lulus' : 'gagal',
+        rincian: ''
+      });
+    } finally {
+      try {
+        if (asli === null) window.localStorage.removeItem(kunci);
+        else window.localStorage.setItem(kunci, asli);
+      } catch (e2) { /* abaikan */ }
+    }
+  }
+
+  if (bisaSimpan) {
+    var kunciAnggota = L.KUNCI_ANGGOTA;
+    var asliAnggota = null;
+    try { asliAnggota = window.localStorage.getItem(kunciAnggota); } catch (e3) { asliAnggota = null; }
+
+    try {
+      L.simpanAnggota([{ id: 'g1', nama: 'Uji', email: 'uji@x.co', peran: 'QA', gaji: 1000 }]);
+      var muatAnggotaUji = L.muatAnggota();
+      hasil.push({
+        nama: 'Simpan lalu muat anggota: data utuh',
+        status: (muatAnggotaUji && muatAnggotaUji.length === 1 &&
+          muatAnggotaUji[0].gaji === 1000 && muatAnggotaUji[0].email === 'uji@x.co') ? 'lulus' : 'gagal',
+        rincian: ''
+      });
+
+      window.localStorage.setItem(kunciAnggota, '{rusak');
+      var anggotaRusak = L.muatAnggota();
+      hasil.push({
+        nama: 'Data anggota rusak ditangani tanpa error',
+        status: (anggotaRusak === null) ? 'lulus' : 'gagal',
+        rincian: ''
+      });
+    } finally {
+      try {
+        if (asliAnggota === null) window.localStorage.removeItem(kunciAnggota);
+        else window.localStorage.setItem(kunciAnggota, asliAnggota);
+      } catch (e4) { /* abaikan */ }
+    }
+  }
+
+  /* ---------- Pelaporan ---------- */
+
+  var lulus = hasil.filter(function (h) { return h.status === 'lulus'; }).length;
+  var gagal = hasil.filter(function (h) { return h.status === 'gagal'; }).length;
+  var dilewat = hasil.filter(function (h) { return h.status === 'lewat'; }).length;
+
+  hasil.forEach(function (h) {
+    var li = document.createElement('li');
+    li.className = h.status;
+    var tanda = h.status === 'lulus' ? '\u2713' : (h.status === 'gagal' ? '\u2717' : '\u25CB');
+    var teks = h.status === 'gagal' ? 'GAGAL' : (h.status === 'lewat' ? 'Dilewati' : 'Lulus');
+
+    var spanTanda = document.createElement('span');
+    spanTanda.className = 'tanda';
+    spanTanda.textContent = tanda;
+
+    var spanTeks = document.createElement('span');
+    var kuat = document.createElement('strong');
+    kuat.textContent = teks;
+    spanTeks.appendChild(kuat);
+    spanTeks.appendChild(document.createTextNode(' \u2014 ' + h.nama));
+    if (h.rincian) {
+      var rincian = document.createElement('span');
+      rincian.className = 'rincian';
+      rincian.textContent = ' (' + h.rincian + ')';
+      spanTeks.appendChild(rincian);
+    }
+
+    li.appendChild(spanTanda);
+    li.appendChild(spanTeks);
+    daftarHasil.appendChild(li);
+  });
+
+  if (gagal === 0) {
+    ringkas.className = 'lulus';
+    ringkas.textContent = 'SEMUA UJI LULUS \u2014 ' + lulus + ' pengujian berhasil' +
+      (dilewat ? ', ' + dilewat + ' dilewati' : '');
+    document.title = '\u2713 ' + document.title;
+  } else {
+    ringkas.className = 'gagal';
+    ringkas.textContent = gagal + ' UJI GAGAL dari ' + hasil.length + ' pengujian';
+    document.title = '\u2717 ' + document.title;
+  }
+})();
+</script>
+</body>
+</html>

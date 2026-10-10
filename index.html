@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manajemen Proyek &mdash; Gantt Chart</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="kepala-app">
+  <div class="brand">
+    <div class="logo" aria-hidden="true">G</div>
+    <div>
+      <h1>Manajemen Proyek</h1>
+      <p>Perencanaan tugas &amp; sub-tugas dengan Gantt Chart</p>
+    </div>
+  </div>
+  <div class="stat" id="statInfo">Memuat&hellip;</div>
+</header>
+
+<div class="bilah-alat">
+  <div class="kiri">
+    <button type="button" id="btnTambah" class="btn utama">+ Tambah Tugas</button>
+    <button type="button" id="btnBukaSemua" class="btn">Perluas Semua</button>
+    <button type="button" id="btnLipatSemua" class="btn">Ciutkan Semua</button>
+    <button type="button" id="btnKalender" class="btn">Kalender Proyek</button>
+    <button type="button" id="btnAnggota" class="btn">Anggota Tim</button>
+    <button type="button" id="btnPert" class="btn">Diagram PERT</button>
+  </div>
+  <div class="kanan">
+    <button type="button" id="btnHapusSemua" class="btn bahaya">Hapus Semua Data</button>
+  </div>
+</div>
+
+<main class="gantt" id="areaGantt">
+  <div class="gantt-dalam" id="ganttDalam">
+
+    <div class="kepala-gantt">
+      <div class="kepala-label grid-kolom">
+        <div class="kolom-lipat" title="Ciutkan / perluas sub-tugas"></div>
+        <div class="kolom-warna" title="Warna indikator"></div>
+        <div class="kolom-nama">Nama Tugas</div>
+        <div class="kolom-mulai">Mulai</div>
+        <div class="kolom-durasi">Durasi</div>
+        <div class="kolom-selesai">Selesai</div>
+        <div class="kolom-prioritas">Prioritas</div>
+        <div class="kolom-aksi">Aksi</div>
+      </div>
+      <div class="kepala-track" id="kepalaTrack">
+        <div class="baris-bulan" id="barisBulan"></div>
+        <div class="baris-hari" id="barisHari"></div>
+        <div class="penanda-hari-ini" id="penandaHariIni" hidden>Hari ini</div>
+      </div>
+    </div>
+
+    <div id="wadahBaris"></div>
+
+    <svg class="panah-gantt" id="svgPanah" aria-hidden="true"></svg>
+
+    <div class="latar-timeline" id="latarTimeline" aria-hidden="true"></div>
+    <div class="garis-hari-ini" id="garisHariIni" aria-hidden="true" hidden></div>
+
+  </div>
+</main>
+
+<div class="modal-latar" id="modalLatar" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalJudul">
+    <h2 id="modalJudul">Tambah Tugas</h2>
+    <form id="formTugas" novalidate>
+      <label class="lebar-penuh" for="fNama">Nama Tugas</label>
+      <input class="lebar-penuh" type="text" id="fNama" maxlength="100" placeholder="cth. Desain antarmuka" autocomplete="off" required>
+
+      <div class="baris-form">
+        <div>
+          <label for="fMulai">Tanggal Mulai</label>
+          <input type="date" id="fMulai" required>
+        </div>
+        <div>
+          <label for="fDurasi">Durasi (hari kerja)</label>
+          <input type="number" id="fDurasi" min="1" max="365" step="1" value="3" required>
+        </div>
+      </div>
+
+      <div class="baris-form">
+        <div>
+          <label for="fPrioritas">Prioritas</label>
+          <select id="fPrioritas">
+            <option value="rendah">Rendah</option>
+            <option value="sedang" selected>Sedang</option>
+            <option value="tinggi">Tinggi</option>
+            <option value="kritis">Kritis</option>
+          </select>
+        </div>
+        <div>
+          <label for="fInduk">Tugas Induk (sub-tugas)</label>
+          <select id="fInduk">
+            <option value="">&mdash; Tanpa induk (tugas utama) &mdash;</option>
+          </select>
+        </div>
+      </div>
+
+      <label for="fWarna">Warna Indikator</label>
+      <div class="pilih-warna">
+        <input type="color" id="fWarna" value="#3b82f6">
+        <div class="preset" id="presetWarna"></div>
+      </div>
+
+      <div class="blok-predecessor">
+        <div class="judul-blok">Predecessor (tugas pendahulu)</div>
+        <div class="baris-form">
+          <div>
+            <label for="fPredTugas">Tugas Pendahulu</label>
+            <select id="fPredTugas"></select>
+          </div>
+          <div>
+            <label for="fPredTipe">Jenis Hubungan</label>
+            <select id="fPredTipe">
+              <option value="FS">Finish-to-Start (FS)</option>
+              <option value="SS">Start-to-Start (SS)</option>
+            </select>
+          </div>
+        </div>
+        <div class="baris-form">
+          <div>
+            <label for="fPredJeda">Jeda (hari kerja)</label>
+            <input type="number" id="fPredJeda" min="0" max="365" step="1" value="0">
+          </div>
+          <div class="wadah-tambah-pred">
+            <span class="label-palsu">&nbsp;</span>
+            <button type="button" class="btn" id="btnTambahPred">+ Tambah Hubungan</button>
+          </div>
+        </div>
+        <ul class="daftar-pred" id="daftarPred"></ul>
+        <p class="catatan" id="catatanPred" hidden>Tanggal mulai tugas ini dihitung otomatis dari predecessor.</p>
+      </div>
+
+      <div class="blok-anggota">
+        <div class="judul-blok">Alokasi Anggota Tim</div>
+        <ul class="daftar-pred" id="daftarAlokasi"></ul>
+        <p class="catatan" id="catatanBiaya" hidden></p>
+      </div>
+
+      <div class="pratinjau" id="pratinjauSelesai">Tanggal selesai: &mdash;</div>
+
+      <p class="galat" id="pesanGalat" hidden></p>
+
+      <div class="aksi-modal">
+        <button type="button" class="btn" id="btnBatal">Batal</button>
+        <button type="submit" class="btn utama" id="btnSimpan">Simpan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-latar" id="modalKalenderLatar" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="judulKalender">
+    <h2 id="judulKalender">Kalender Proyek</h2>
+    <form id="formKalender" novalidate>
+      <div class="judul-blok">Hari akhir pekan (tidak dihitung sebagai hari kerja)</div>
+      <div class="pilihan-hari" id="pilihanHari"></div>
+
+      <div class="judul-blok">Hari libur khusus</div>
+      <div class="baris-form">
+        <div>
+          <label for="fLiburTanggal">Tanggal</label>
+          <input type="date" id="fLiburTanggal">
+        </div>
+        <div>
+          <label for="fLiburNama">Keterangan</label>
+          <input type="text" id="fLiburNama" maxlength="60" placeholder="cth. Hari Natal" autocomplete="off">
+        </div>
+      </div>
+      <button type="button" class="btn" id="btnTambahLibur">+ Tambah Hari Libur</button>
+      <ul class="daftar-libur" id="daftarLibur"></ul>
+
+      <div class="pratinjau" id="ringkasKalender">Hari kerja: &mdash;</div>
+      <p class="galat" id="galatKalender" hidden></p>
+
+      <div class="aksi-modal">
+        <button type="button" class="btn" id="btnKalenderBawaan">Kembalikan Bawaan</button>
+        <button type="button" class="btn" id="btnKalenderBatal">Batal</button>
+        <button type="submit" class="btn utama" id="btnKalenderSimpan">Simpan Kalender</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-latar" id="modalAnggotaLatar" hidden>
+  <div class="modal modal-lebar" role="dialog" aria-modal="true" aria-labelledby="judulAnggota">
+    <h2 id="judulAnggota">Anggota Tim</h2>
+    <form id="formAnggota" novalidate>
+      <label for="fAnggotaNama">Nama Anggota</label>
+      <input type="text" id="fAnggotaNama" maxlength="80" placeholder="cth. Sari Wulandari" autocomplete="off">
+      <div class="baris-form">
+        <div>
+          <label for="fAnggotaEmail">Email</label>
+          <input type="text" id="fAnggotaEmail" maxlength="120" placeholder="cth. sari@contoh.com" autocomplete="off">
+        </div>
+        <div>
+          <label for="fAnggotaPeran">Peran</label>
+          <input type="text" id="fAnggotaPeran" maxlength="60" placeholder="cth. Backend Developer" autocomplete="off">
+        </div>
+      </div>
+      <label for="fAnggotaGaji">Gaji per Bulan (Rp)</label>
+      <input type="number" id="fAnggotaGaji" min="0" max="1000000000000" step="100000" value="0">
+      <p class="galat" id="galatAnggota" hidden></p>
+      <div class="aksi-modal">
+        <button type="button" class="btn" id="btnAnggotaBatal">Batal</button>
+        <button type="submit" class="btn utama" id="btnAnggotaSimpan">Simpan Anggota</button>
+      </div>
+    </form>
+    <div class="judul-blok">Daftar Anggota</div>
+    <ul class="daftar-anggota-besar" id="daftarAnggota"></ul>
+  </div>
+</div>
+
+<div class="modal-latar" id="modalPertLatar" hidden>
+  <div class="modal modal-lebar" role="dialog" aria-modal="true" aria-labelledby="judulPert">
+    <h2 id="judulPert">Diagram PERT &amp; Jalur Kritis</h2>
+    <p class="ringkas-analisis" id="ringkasAnalisis">&mdash;</p>
+    <div class="wadah-pert" id="wadahPert"></div>
+    <p class="catatan">Kotak berbingkai merah = tugas jalur kritis. Panah = hubungan predecessor (FS/SS).</p>
+    <div class="aksi-modal">
+      <button type="button" class="btn utama" id="btnPertTutup">Tutup</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/logic.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
